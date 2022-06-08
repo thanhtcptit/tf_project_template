@@ -2,7 +2,8 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 from tensorflow.keras import backend as K
-from tensorflow.keras.callbacks import LearningRateScheduler
+
+E = 2.71828
 
 
 def bell_curve_lr_scheduler(lr_start=1e-5, lr_max=5e-5, lr_min=1e-6, lr_rampup_epochs=5, 
@@ -19,18 +20,18 @@ def bell_curve_lr_scheduler(lr_start=1e-5, lr_max=5e-5, lr_min=1e-6, lr_rampup_e
     return lrfn
 
 
-def decay_lr_scheduler(lr=1e-5):
+def decay_lr_scheduler(lr=1e-5, decay_rate=0.8):
     def lrfn(epoch):
-        return lr / (epoch + 1)
+        return lr / (decay_rate * epoch + 1)
     return lrfn
 
 
-def get_lr_scheduler(name, params):
+def get_lr_scheduler_callback(name, params):
     lr_scheduler_dict = {
         "decay": decay_lr_scheduler,
         "bell": bell_curve_lr_scheduler
     }
-    return LearningRateScheduler(lr_scheduler_dict[name](**params))
+    return tf.keras.callbacks.LearningRateScheduler(lr_scheduler_dict[name](**params))
 
 
 def get_optimizer(name):
@@ -40,6 +41,24 @@ def get_optimizer(name):
         "rms": keras.optimizers.RMSprop
     }
     return optimizer_dict[name]
+
+
+def log(x, base=E):
+    numerator = tf.math.log(x)
+    denominator = tf.math.log(tf.constant(base, dtype=numerator.dtype))
+    return numerator / denominator
+
+
+def weighted_mse(y_true, y_pred):
+    pseudo_label = tf.where(y_true == 0, y_true, tf.ones_like(y_true))
+    d = tf.square(pseudo_label - y_pred) * (2 * log(y_true + 1, 10) + 1)
+    return tf.reduce_mean(d, axis=-1)
+
+
+def weighted_bce(y_true, y_pred):
+    pseudo_label = tf.where(y_true == 0, y_true, tf.ones_like(y_true))
+    d = tf.keras.backend.binary_crossentropy(pseudo_label, y_pred) * (2 * log(y_true + 1, 10) + 1)
+    return tf.reduce_mean(d, axis=-1)
 
 
 def focal_loss(gamma=2.0, alpha=0.2):
@@ -54,8 +73,10 @@ def focal_loss(gamma=2.0, alpha=0.2):
 def get_loss_fn(name):
     loss_fn_dict = {
         "bce": keras.losses.BinaryCrossentropy,
+        "wbce": weighted_bce,
         "cce": keras.losses.CategoricalCrossentropy,
         "mse": keras.losses.MeanSquaredError,
+        "wmse": weighted_mse,
         "focal": focal_loss
     }
     return loss_fn_dict[name]
@@ -66,6 +87,6 @@ def get_callback_fn(name):
         "early_stopping": keras.callbacks.EarlyStopping,
         "model_checkpoint": keras.callbacks.ModelCheckpoint,
         "logging": keras.callbacks.CSVLogger,
-        "lr_scheduler": get_lr_scheduler
+        "lr_scheduler": get_lr_scheduler_callback
     }
     return callback_fn_dict[name]
