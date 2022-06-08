@@ -1,8 +1,9 @@
-# Machine Learning Project Template
+# Tensorflow Project Template
 
 ### Requirements to use this template:
 -----------
  - Python >= 3.6
+ - Tensorflow >= 2.0
  - [Cookiecutter Python package](http://cookiecutter.readthedocs.org/en/latest/installation.html) >= 1.4.0: This can be installed with pip by or conda depending on how you manage your Python packages:
 
 ``` bash
