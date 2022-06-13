@@ -31,8 +31,8 @@ def train(config_path, checkpoint_dir, recover=False, force=False):
     if os.path.exists(checkpoint_dir):
         if force:
             shutil.rmtree(checkpoint_dir)
-        else:
-            raise ValueError(f"{checkpoint_dir} already existed")
+        elif not recover:
+            raise ValueError(f"{checkpoint_dir} already exists!")
     weight_dir = os.path.join(checkpoint_dir, "checkpoints")
     os.makedirs(weight_dir, exist_ok=True)
     shutil.copyfile(config_path, os.path.join(checkpoint_dir, "config.json"))

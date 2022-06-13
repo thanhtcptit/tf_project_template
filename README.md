@@ -21,7 +21,7 @@ $ conda install cookiecutter
 ### To start a new project, run:
 ------------
 
-    cookiecutter https://github.com/thanhtcptit/ml_template
+    cookiecutter https://github.com/thanhtcptit/tf_project_template
 
 
 
