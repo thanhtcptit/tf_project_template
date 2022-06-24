@@ -50,5 +50,12 @@
                 "type": "logging"
             }
         ]
+    },
+    "hyp": {
+        "trainer.optimizer.params.learning_rate": {
+            "type": "float",
+            "range": [1e-5, 1e-3],
+            "log": true
+        }
     }
 }

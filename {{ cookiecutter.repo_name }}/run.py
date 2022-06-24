@@ -33,8 +33,8 @@ def main(subcommand_overrides={}):
 
     subcommands = {
         "train": Train(),
-        "hyp": HyperparamsSearch(),
         "eval": Evaluate(),
+        "hyp": HyperparamsSearch(),
         "export": ExportModel(),
         **subcommand_overrides
     }
@@ -82,28 +82,8 @@ class Train(Subcommand):
 
 
 def train_model(args):
-    raise NotImplementedError()
-
-
-class HyperparamsSearch(Subcommand):
-    def add_subparser(self, name, subparsers):
-        description = "Run hyperparams search"
-        subparser = subparsers.add_parser(name, description=description,
-                                          help=description)
-
-        subparser.add_argument(
-            "config_path", type=str,
-            help="path to the json config file")
-        subparser.add_argument(
-            "-f", "--force", action="store_true",
-            help="force override serialization dir")
-
-        subparser.set_defaults(func=hyperparams_search)
-        return subparser
-
-
-def hyperparams_search(args):
-    raise NotImplementedError()
+    from src.train import train as func
+    return func(args.config_path, args.save_dir, args.recover, args.force)
 
 
 class Evaluate(Subcommand):
@@ -123,7 +103,36 @@ class Evaluate(Subcommand):
 
 
 def evaluate_model(args):
-    raise NotImplementedError()
+    from src.train import test as func
+    return func(args.checkpoint_path, args.dataset_path)
+
+
+class HyperparamsSearch(Subcommand):
+    def add_subparser(self, name, subparsers):
+        description = "Run hyperparams search"
+        subparser = subparsers.add_parser(name, description=description,
+                                          help=description)
+
+        subparser.add_argument(
+            "config_path", type=str,
+            help="path to the json config file")
+        subparser.add_argument(
+            "-t", "--test_dataset_path", type=str, default=None,
+            help="path to evaluate dataset")
+        subparser.add_argument(
+            "-n", "--num_trials", type=str, default=None,
+            help="number of trials to run")
+        subparser.add_argument(
+            "-f", "--force", action="store_true",
+            help="force override serialization dir")
+
+        subparser.set_defaults(func=hyperparams_search)
+        return subparser
+
+
+def hyperparams_search(args):
+    from src.train import hyperparams_search as func
+    return func(args.config_path, args.test_dataset_path, args.num_trials, args.force)
 
 
 class ExportModel(Subcommand):
