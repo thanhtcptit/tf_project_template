@@ -22,29 +22,23 @@
         },
         "optimizer": {
             "type": "adam",
-            "params": {
-                "learning_rate": 3e-5
-            }
+            "learning_rate": 3e-5
         },
         "callbacks": [
             {
                 "type": "early_stopping",
-                "params": {
-                    "monitor": "val_binary_accuracy",
-                    "mode": "max",
-                    "patience": 5,
-                    "min_delta": 1e-3,
-                    "restore_best_weights": true
-                }
+                "monitor": "val_binary_accuracy",
+                "mode": "max",
+                "patience": 5,
+                "min_delta": 1e-3,
+                "restore_best_weights": true
             },
             {
                 "type": "model_checkpoint",
-                "params": {
-                    "monitor": "val_binary_accuracy",
-                    "mode": "max",
-                    "save_weights_only": true,
-                    "save_best_only": true
-                }
+                "monitor": "val_binary_accuracy",
+                "mode": "max",
+                "save_weights_only": true,
+                "save_best_only": true
             },
             {
                 "type": "logging"
@@ -52,7 +46,7 @@
         ]
     },
     "hyp": {
-        "trainer.optimizer.params.learning_rate": {
+        "trainer.optimizer.learning_rate": {
             "type": "float",
             "range": [1e-5, 1e-3],
             "log": true

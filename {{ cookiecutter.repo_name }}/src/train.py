@@ -11,6 +11,7 @@ import tensorflow.keras as keras
 from tqdm import tqdm
 from pprint import pprint
 
+from src.utils.loss_fn import *
 from src.utils.train_utils import *
 from src.models.base import BaseModel
 from src.utils import Params, save_json, save_txt, load_json, get_current_time_str, Logger
@@ -27,16 +28,16 @@ def create_tf_dataset(data, batch_size, is_train=False):
 
 
 def evaluate(model, test_dataset, trainer_config):
-    if trainer_config["loss_fn"]["type"] in ["bce", "wbce", "cce", "focal"]:
-        metrics = [
+    metrics = []
+    if trainer_config["loss_fn"]["type"] in CLASSIFICATION_LOSSES:
+        metrics += [
             keras.metrics.BinaryAccuracy(),
             keras.metrics.Precision(),
             keras.metrics.Recall(),
             keras.metrics.PrecisionAtRecall(recall=0.8)
         ]
-    else:
-        metrics = []
-    loss_fn = get_loss_fn(trainer_config["loss_fn"]["type"])(**trainer_config["loss_fn"].get("params", {}))
+
+    loss_fn = loss_fn = build_loss_fn(trainer_config["loss_fn"])
     mean_loss = keras.metrics.Mean()
     for batch in test_dataset:
         preds = model(batch[0], training=False)
@@ -83,8 +84,8 @@ def train(config_path, checkpoint_dir, recover=False, force=False):
     if recover:
         model.load_weights(weight_dir)
 
-    optimizer = get_optimizer(trainer_config["optimizer"]["type"])(**trainer_config["optimizer"].get("params", {}))
-    loss_fn = get_loss_fn(trainer_config["loss_fn"]["type"])(**trainer_config["loss_fn"].get("params", {}))
+    loss_fn = build_loss_fn(trainer_config["loss_fn"])
+    optimizer = build_optimizer(trainer_config["optimizer"])
 
     # Custom training loop
     # log_file = os.path.join(checkpoint_dir, "log.txt")
@@ -143,18 +144,20 @@ def train(config_path, checkpoint_dir, recover=False, force=False):
     callbacks = []
     if "callbacks" in trainer_config:
         for callback in trainer_config["callbacks"]:
-            if "params" not in callback:
-                callback["params"] = {}
             if callback["type"] == "model_checkpoint":
-                callback["params"]["filepath"] = os.path.join(weight_dir, "best.ckpt")
+                callback["filepath"] = os.path.join(weight_dir, "best.ckpt")
             elif callback["type"] == "logging":
-                callback["params"]["filename"] = os.path.join(checkpoint_dir, "log.csv")
-            callbacks.append(get_callback_fn(callback["type"])(**callback["params"]))
+                callback["filename"] = os.path.join(checkpoint_dir, "log.csv")
+            callbacks.append(build_callback_fn(callback))
+
+    metrics = []
+    if trainer_config["loss_fn"]["type"] in CLASSIFICATION_LOSSES:
+        metrics += [tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.Precision(),
+                    tf.keras.metrics.Recall(), tf.keras.metrics.PrecisionAtRecall(recall=0.8)]
     model.compile(
         optimizer=optimizer,
         loss=loss_fn,
-        metrics=[tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.Precision(),
-                 tf.keras.metrics.Recall(), tf.keras.metrics.PrecisionAtRecall(recall=0.8)])
+        metrics=metrics)
     model.fit(
         train_dataset, validation_data=val_dataset, epochs=trainer_config["num_epochs"],
         callbacks=callbacks)
@@ -177,9 +180,12 @@ def test(checkpoint_dir, dataset_path):
 
     model = BaseModel.from_params(model_config).build_graph()
     model.load_weights(os.path.join(checkpoint_dir, "checkpoints/best.ckpt"))
-    model.compile(
-        metrics=[tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.Precision(),
-                 tf.keras.metrics.Recall(), tf.keras.metrics.PrecisionAtRecall(recall=0.8)])
+
+    metrics = []
+    if trainer_config["loss_fn"]["type"] in CLASSIFICATION_LOSSES:
+        metrics += [tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.Precision(),
+                    tf.keras.metrics.Recall(), tf.keras.metrics.PrecisionAtRecall(recall=0.8)]
+    model.compile(metrics=metrics)
     metrics = model.evaluate(test_dataset)
     print(metrics)
     return metrics
