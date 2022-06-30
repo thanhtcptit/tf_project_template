@@ -1,0 +1,7 @@
+{
+    "path": {
+        "train": "data/processed/train.csv",
+        "val":   "data/processed/val.csv",
+        "test":  "data/processed/test.csv"
+    }
+},

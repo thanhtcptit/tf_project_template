@@ -11,10 +11,8 @@ import tensorflow.keras as keras
 from tqdm import tqdm
 from pprint import pprint
 
-from src.utils.loss_fn import *
-from src.utils.train_utils import *
+from src.utils import *
 from src.models.base import BaseModel
-from src.utils import Params, save_json, save_txt, load_json, get_current_time_str, Logger
 
 tf.get_logger().setLevel('INFO')
 
@@ -54,28 +52,29 @@ def evaluate(model, test_dataset, trainer_config):
     return results
 
 
-def train(config_path, checkpoint_dir, recover=False, force=False):
+def train(config_path, dataset_path, checkpoint_dir, recover=False, force=False):
     config = Params.from_file(config_path)
-    data_config = config["data"]
+    config["dataset_path"] = dataset_path
     model_config = config["model"]
     trainer_config = config["trainer"]
     pprint(config.as_dict())
 
     if not checkpoint_dir:
+        dataset_name = get_basename(dataset_path)
         config_name = os.path.splitext(os.path.basename(config_path))[0]
-        checkpoint_dir = os.path.join("train_logs", config_name)
+        checkpoint_dir = os.path.join("train_logs", dataset_name, config_name)
     if os.path.exists(checkpoint_dir):
         if force:
             shutil.rmtree(checkpoint_dir)
-        elif not recover:
-            raise ValueError(f"{checkpoint_dir} already exists!")
+        else:
+            raise ValueError(f"{checkpoint_dir} already existed")
     weight_dir = os.path.join(checkpoint_dir, "checkpoints")
     os.makedirs(weight_dir, exist_ok=True)
-    shutil.copyfile(config_path, os.path.join(checkpoint_dir, "config.json"))
+    save_json(os.path.join(checkpoint_dir, "config.json"), config.as_dict())
     print("Train log: ", checkpoint_dir)
 
-    train_df = pd.read_csv(data_config["path"]["train"])
-    val_df = pd.read_csv(data_config["path"]["val"])
+    train_df = pd.read_csv(os.path.join(dataset_path, "train.csv"))
+    val_df = pd.read_csv(os.path.join(dataset_path, "val.csv"))
 
     train_dataset = create_tf_dataset(train_df, trainer_config["batch_size"], is_train=True)
     val_dataset = create_tf_dataset(val_df, trainer_config["batch_size"])
@@ -167,15 +166,15 @@ def train(config_path, checkpoint_dir, recover=False, force=False):
     return metrics
 
 
-def test(checkpoint_dir, dataset_path):
+def test(checkpoint_dir, test_dataset_path):
     config = Params.from_file(os.path.join(checkpoint_dir, "config.json"))
-    data_config = config["data"]
+    dataset_path = config["dataset_path"]
     model_config = config["model"]
     trainer_config = config["trainer"]
 
-    if not dataset_path:
-        dataset_path = data_config["path"]["val"]
-    test_df = pd.read_csv(dataset_path)
+    if not test_dataset_path:
+        test_dataset_path = os.path.join(dataset_path, "val.csv")
+    test_df = pd.read_csv(test_dataset_path)
     test_dataset = create_tf_dataset(test_df, trainer_config["batch_size"], is_train=True)
 
     model = BaseModel.from_params(model_config).build_graph()
@@ -191,13 +190,14 @@ def test(checkpoint_dir, dataset_path):
     return metrics
 
 
-def hyperparams_search(config_file, dataset_path, num_trials=50, force=False):
+def hyperparams_search(config_file, dataset_path, test_dataset_path, num_trials=50, force=False):
     import optuna
     from optuna.integration import TFKerasPruningCallback
 
     def objective(trial):
         tf.keras.backend.clear_session()
 
+        dataset_name = get_basename(dataset_path)
         config_name = os.path.splitext(os.path.basename(config_file))[0]
         config = load_json(config_file)
         hyp_config = config["hyp"]
@@ -216,13 +216,13 @@ def hyperparams_search(config_file, dataset_path, num_trials=50, force=False):
             config_name += f"_{k_list[-1]}-{val}"
 
         config.pop("hyp")
-        checkpoint_dir = f"/tmp/{config_name}"
+        checkpoint_dir = f"/tmp/{dataset_name}/{config_name}"
         trial_config_file = os.path.join(f"/tmp/hyp_{get_current_time_str()}.json")
         save_json(trial_config_file, config)
 
-        best_val = train(trial_config_file, checkpoint_dir, force=force)[0]
-        if dataset_path:
-            best_val = test(checkpoint_dir, dataset_path)[0]
+        best_val = train(trial_config_file, dataset_path, checkpoint_dir, force=force)[0]
+        if test_dataset_path:
+            best_val = test(checkpoint_dir, test_dataset_path)[0]
         return best_val
 
     study = optuna.create_study(study_name="hyp", direction="maximize")

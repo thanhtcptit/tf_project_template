@@ -1,12 +1,5 @@
 {
     "seed": 442,
-    "data": {
-        "path": {
-            "train": "data/processed/train.csv",
-            "val":   "data/processed/val.csv",
-            "test":  "data/processed/test.csv"
-        }
-    },
     "model": {
         "type": "base",
         "depth": 2,
