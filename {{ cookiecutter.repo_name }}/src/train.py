@@ -87,6 +87,10 @@ def train(config_path, dataset_path, checkpoint_dir, recover=False, force=False)
     optimizer = build_optimizer(trainer_config["optimizer"])
 
     # Custom training loop
+    # grad_clip_fn = None
+    # if "grad_clip" in trainer_config:
+    #     grad_clip_fn = build_gradient_clipping_fn(trainer_config["grad_clip"])  
+
     # log_file = os.path.join(checkpoint_dir, "log.txt")
     # logger = Logger(log_file, stdout=False)
     # logger.log(f"\n=======================================\n")
@@ -103,10 +107,8 @@ def train(config_path, dataset_path, checkpoint_dir, recover=False, force=False)
     #     if train_item_emb:
     #         trainable_weights.append(model.trainable_weights[1])
     #     grads = tape.gradient(loss_value, trainable_weights)
-    #     if "grad_clip" in trainer_config:
-    #         grads = [(tf.clip_by_value(grad, clip_value_min=trainer_config["grad_clip"]["min_value"],
-    #                                    clip_value_max=trainer_config["grad_clip"]["max_value"]))
-    #                                    for grad in grads]
+    #     if grad_clip_fn:
+    #         grads = grad_clip_fn(grads)
     #     optimizer.apply_gradients(zip(grads, trainable_weights))
     #     return loss_value
 
@@ -194,7 +196,7 @@ def hyperparams_search(config_file, dataset_path, test_dataset_path, num_trials=
     import optuna
     from optuna.integration import TFKerasPruningCallback
 
-    def objective(trial):
+    def training(trial):
         tf.keras.backend.clear_session()
 
         dataset_name = get_basename(dataset_path)
@@ -225,8 +227,8 @@ def hyperparams_search(config_file, dataset_path, test_dataset_path, num_trials=
             best_val = test(checkpoint_dir, test_dataset_path)[0]
         return best_val
 
-    study = optuna.create_study(study_name="hyp", direction="maximize")
-    study.optimize(objective, n_trials=num_trials, gc_after_trial=True,
+    study = optuna.create_study(study_name="training", direction="maximize")
+    study.optimize(training, n_trials=num_trials, gc_after_trial=True,
                    catch=(tf.errors.InvalidArgumentError,))
     print("Number of finished trials: ", len(study.trials))
 
